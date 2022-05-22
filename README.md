@@ -15,3 +15,6 @@ with README.md
 Enjoy!
 
 Sam Lantinga (slouken@libsdl.org)
+
+## About this port
+This is a port of SDL2 to the Playdate. The build succeds, but be warned: it will error at the end when attempting to produce a Playdate Game file. This is normal, and this project isn't a game by itself.
