@@ -2,7 +2,34 @@ if(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_CURRENT_BINARY_DIR})
   message(FATAL_ERROR "Prevented in-tree build. Please create a build directory outside of the SDL source code and run \"cmake -S ${CMAKE_SOURCE_DIR} -B .\" from there")
 endif()
 
-cmake_minimum_required(VERSION 3.0.0)
+if(${TARGET_PLAYDATE})
+  cmake_minimum_required(VERSION 3.14)
+  set(CMAKE_C_STANDARD 11)
+
+  set(ENVSDK $ENV{PLAYDATE_SDK_PATH})
+
+  if (NOT ${ENVSDK} STREQUAL "")
+    # Convert path from Windows
+    file(TO_CMAKE_PATH ${ENVSDK} SDK)
+  else()
+    execute_process(
+        COMMAND bash -c "egrep '^\\s*SDKRoot' $HOME/.Playdate/config"
+        COMMAND head -n 1
+        COMMAND cut -c9-
+        OUTPUT_VARIABLE SDK
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+  endif()
+  if (NOT EXISTS ${SDK})
+    message(FATAL_ERROR "SDK Path not found; set ENV value PLAYDATE_SDK_PATH")
+    return()
+  endif()
+  set(PLAYDATE_GAME_NAME SDL2)
+  set(PLAYDATE_GAME_DEVICE SDL2_DEVICE)
+else()
+  cmake_minimum_required(VERSION 3.0.0)
+endif()
+
 project(SDL2 C CXX)
 
 if (HAIKU)
@@ -2881,7 +2908,7 @@ endif()
 # Ensure that the extra cflags are used at compile time
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${EXTRA_CFLAGS}")
 
-if(NOT WINDOWS_STORE AND NOT SDL2_DISABLE_SDL2MAIN)
+if(NOT WINDOWS_STORE AND NOT SDL2_DISABLE_SDL2MAIN AND NOT TARGET_PLAYDATE)
   # Build SDLmain
   add_library(SDL2main STATIC ${SDLMAIN_SOURCES})
   # alias target for in-tree builds
@@ -2896,6 +2923,27 @@ if(NOT WINDOWS_STORE AND NOT SDL2_DISABLE_SDL2MAIN)
   endif()
 endif()
 
+if (TARGET_PLAYDATE AND NOT SDL2_DISABLE_SDL2MAIN)
+  # Build SDLmain
+  if (TOOLCHAIN STREQUAL "armgcc")
+    add_library(SDL2main STATIC ${SDK}/C_API/buildsupport/setup.c ${SDLMAIN_SOURCES})
+  else()
+    add_library(SDL2main STATIC ${SDLMAIN_SOURCES})
+  endif()
+  add_library(SDL2::SDL2main ALIAS SDL2main)
+  target_include_directories(SDL2main BEFORE PRIVATE "${SDL2_BINARY_DIR}/include")
+  target_include_directories(SDL2main PUBLIC "$<BUILD_INTERFACE:${SDL2_SOURCE_DIR}/include>" $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}> $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}/SDL2>)
+  if (WIN32 AND NOT TARGET_PLAYDATE)
+    # Don't link shell32 if targeting playdate
+    target_link_libraries(SDL2main PRIVATE shell32)
+  endif()
+  if (NOT ANDROID)
+    set_target_properties(SDL2main PROPERTIES DEBUG_POSTFIX "${SDL_CMAKE_DEBUG_POSTFIX}")
+  endif()
+endif()
+
+
+
 if(ANDROID)
   target_include_directories(sdl-build-options INTERFACE "${ANDROID_NDK}/sources/android/cpufeatures")
 endif()
@@ -2904,7 +2952,8 @@ if(APPLE)
   target_compile_options(sdl-build-options INTERFACE "-fobjc-arc")
 endif()
 
-if(SDL_SHARED)
+if(SDL_SHARED AND NOT TARGET_PLAYDATE)
+  # Playdate doesn't have a shared library loader. Don't allow building sharedlibs on Playdate
   add_library(SDL2 SHARED ${SOURCE_FILES} ${VERSION_SOURCES})
   # alias target for in-tree builds
   add_library(SDL2::SDL2 ALIAS SDL2)
@@ -2949,9 +2998,14 @@ if(SDL_SHARED)
   endif()
 endif()
 
-if(SDL_STATIC)
+if(SDL_STATIC or TARGET_PLAYDATE)
+  # Force static build if targeting playdate
   set (BUILD_SHARED_LIBS FALSE)
-  add_library(SDL2-static STATIC ${SOURCE_FILES})
+  if (TOOLCHAIN STREQUAL "armgcc")
+    add_library(SDL2-static STATIC ${SDK}/C_API/buildsupport/setup.c ${SOURCE_FILES})
+  else()
+    add_library(SDL2-static STATIC ${SDK}/C_API/buildsupport/setup.c ${SOURCE_FILES})
+  endif()
   # alias target for in-tree builds
   add_library(SDL2::SDL2-static ALIAS SDL2-static)
   if (NOT SDL_SHARED OR NOT WIN32 OR MINGW)
