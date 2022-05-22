@@ -3179,3 +3179,7 @@ endif()
 
 ##### Fix Objective C builds #####
 set(CMAKE_OBJC_FLAGS "${CMAKE_OBJC_FLAGS} ${CMAKE_C_FLAGS}")
+
+if({TARGET_PLAYDATE})
+  include(${SDK}/C_API/buildsupport/playdate_game.cmake)
+endif()
