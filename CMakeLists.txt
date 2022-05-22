@@ -2998,7 +2998,7 @@ if(SDL_SHARED AND NOT TARGET_PLAYDATE)
   endif()
 endif()
 
-if(SDL_STATIC or TARGET_PLAYDATE)
+if(SDL_STATIC OR TARGET_PLAYDATE)
   # Force static build if targeting playdate
   set (BUILD_SHARED_LIBS FALSE)
   if (TOOLCHAIN STREQUAL "armgcc")
