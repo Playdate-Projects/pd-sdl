@@ -15,3 +15,6 @@ with README.md
 Enjoy!
 
 Sam Lantinga (slouken@libsdl.org)
+
+## OLD
+Hi. This port is unmaintaned. I'm gonna make a new one soon though!
